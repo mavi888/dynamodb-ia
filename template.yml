@@ -1,0 +1,76 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: 'AWS::Serverless-2016-10-31'
+
+Resources:
+
+  PutFunction:
+      Type: 'AWS::Serverless::Function'
+      Properties:
+        Handler: handler.put
+        Runtime: nodejs14.x
+        CodeUri: .
+        Policies:
+          - DynamoDBCrudPolicy:
+              TableName: FirstTable
+        Environment:
+          Variables:
+            FIRST_TABLE_NAME: FirstTable
+        Events:
+          PutOrderAPI:
+            Type: Api
+            Properties:
+              Path: /put
+              Method: POST
+
+  ProcessFunction:
+    Type: 'AWS::Serverless::Function'
+    Properties:
+      Handler: handler.process
+      Runtime: nodejs14.x
+      CodeUri: .
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: SecondTable
+      Environment:
+          Variables:
+            SECOND_TABLE_NAME: SecondTable
+      Events:
+        Stream:
+          Type: DynamoDB
+          Properties:
+            Stream: !GetAtt FirstTable.StreamArn
+            BatchSize: 1
+            StartingPosition: TRIM_HORIZON
+            FilterCriteria:
+              Filters: 
+                - Pattern: "{ \"eventName\" : [\"REMOVE\"] }"
+  
+  FirstTable:
+    Type: "AWS::DynamoDB::Table"
+    Properties:
+      AttributeDefinitions:
+      - AttributeName: "id"
+        AttributeType: "S"
+      KeySchema:
+      - AttributeName: "id"
+        KeyType: "HASH"
+      BillingMode: 'PAY_PER_REQUEST'
+      TableName: 'FirstTable'
+      TimeToLiveSpecification:
+        AttributeName: "ttl"
+        Enabled: true
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+
+  SecondTable:
+    Type: "AWS::DynamoDB::Table"
+    Properties:
+      AttributeDefinitions:
+      - AttributeName: "id"
+        AttributeType: "S"
+      KeySchema:
+      - AttributeName: "id"
+        KeyType: "HASH"
+      BillingMode: 'PAY_PER_REQUEST'
+      TableName: 'SecondTable'
+      TableClass: STANDARD_INFREQUENT_ACCESS

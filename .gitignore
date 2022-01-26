@@ -1,0 +1,4 @@
+package-lock.json
+samconfig.toml
+node_modules/
+.vscode/
